@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>二合一财务助手 - 拆分与大写转换</title>
+    <style>
+        body { font-family: 'Segoe UI', "Microsoft YaHei", sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        h2 { color: #1a73e8; margin-top: 0; border-bottom: 2px solid #e8f0fe; padding-bottom: 10px; }
+        
+        /* 共通组件 */
+        textarea, input[type="number"] { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        button { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; margin-top: 10px; }
+        .btn-blue { background: #1a73e8; color: white; }
+        .btn-green { background: #34a853; color: white; }
+        .btn-blue:hover { background: #1557b0; }
+        
+        /* 拆分功能样式 */
+        .table-wrapper { overflow-x: auto; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; font-size: 14px; text-align: right; }
+        th { background: #f8f9fa; color: #555; text-align: center; }
+        .origin-col { background: #fdfdfd; font-weight: bold; text-align: left; }
+
+        /* 大写功能样式 */
+        .result-box { background: #e8f0fe; padding: 20px; border-radius: 8px; margin-top: 15px; font-size: 22px; color: #1a73e8; font-weight: bold; word-break: break-all; }
+        .hint { font-size: 13px; color: #777; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="text-align:center; color: #202124;">二合一财务助手</h1>
+
+    <div class="card">
+        <h2>1. 金额批量拆分 (单项 < 50,000)</h2>
+        <p class="hint">每行输入一个数字，自动拆分为 49,999 + 剩余部分。结果可直接粘贴回 Excel 独立单元格。</p >
+        <textarea id="splitInput" rows="5" placeholder="例如：&#10;96181.11&#10;150000.50"></textarea>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-blue" onclick="doSplit()">执行拆分</button>
+            <button class="btn-green" onclick="copySplitTable()">复制拆分结果表格</button>
+        </div>
+        
+        <div class="table-wrapper">
+            <table id="splitTable">
+                <thead id="splitHead"></thead>
+                <tbody id="splitBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>2. 人民币大写转换</h2>
+        <p class="hint">输入阿拉伯数字，即时生成标准财务大写。</p >
+        <input type="number" id="upperInput" placeholder="输入金额，如 1234.56" step="0.01" oninput="doConvertUpper()">
+        <div class="result-box" id="upperResult">等待输入...</div>
+        <button class="btn-blue" onclick="copyUpperText()">复制大写金额</button>
+    </div>
+</div>
+
+<script>
+    /* --- 拆分逻辑 --- */
+    function doSplit() {
+        const input = document.getElementById('splitInput').value;
+        const lines = input.split(/\n/);
+        const tbody = document.getElementById('splitBody');
+        const thead = document.getElementById('splitHead');
+        const LIMIT = 49999;
+        
+        tbody.innerHTML = ''; 
+        let maxCols = 0;
+        let results = [];
+
+        lines.forEach(line => {
+            let val = line.trim().replace(/,/g, '');
+            if (val === "" || isNaN(val)) return;
+            let num = parseFloat(val);
+            let chunks = [];
+            let tempNum = num;
+            while (tempNum > 0) {
+                if (tempNum >= 50000) {
+                    chunks.push(LIMIT.toFixed(2));
+                    tempNum = Math.round((tempNum - LIMIT) * 100) / 100;
+                } else {
+                    chunks.push(tempNum.toFixed(2));
+                    tempNum = 0;
+                }
+            }
+            results.push({original: val, chunks: chunks});
+            if (chunks.length > maxCols) maxCols = chunks.length;
+        });
+
+        // 生成动态表头
+        let headHtml = '<tr><th class="origin-col">原始数字</th>';
+        for (let i = 1; i <= maxCols; i++) headHtml += `<th>拆分项 ${i}</th>`;
+        headHtml += '<th>项数</th></tr>';
+        thead.innerHTML = headHtml;
+
+        // 生成行
+        results.forEach(res => {
+            let row = tbody.insertRow();
+            row.insertCell().innerText = res.original;
+            row.cells[0].className = 'origin-col';
+            for (let i = 0; i < maxCols; i++) {
+                row.insertCell().innerText = res.chunks[i] || "";
+            }
+            row.insertCell().innerText = res.chunks.length;
+        });
+    }
+
+    function copySplitTable() {
+        const table = document.getElementById('splitTable');
+        if (table.rows.length === 0) return;
+        const range = document.createRange();
+        range.selectNode(table);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('copy');
+        alert('拆分结果表格已复制！可以直接粘贴到 Excel。');
+    }
+
+    /* --- 大写转换逻辑 --- */
+    function digitToChinese(n) {
+        if (n === "" || isNaN(n)) return "等待输入...";
+        if (n == 0) return "零圆整";
+        let fraction = ['角', '分'], digit = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
+        let unit = [['圆', '万', '亿'], ['', '拾', '佰', '仟']];
+        let s = '', head = n < 0 ? '欠' : '';
+        n = Math.abs(n);
+        for (let i = 0; i < fraction.length; i++) {
+            s += (digit[Math.floor(Math.round(n * 100) / 10 * Math.pow(10, i)) % 10] + fraction[i]).replace(/零./, '');
+        }
+        s = s || '整';
+        n = Math.floor(n);
+        for (let i = 0; i < unit[0].length && n > 0; i++) {
+            let p = '';
+            for (let j = 0; j < unit[1].length && n > 0; j++) {
+                p = digit[n % 10] + unit[1][j] + p;
+                n = Math.floor(n / 10);
+            }
+            s = p.replace(/(零.)*零$/, '').replace(/^$/, '零') + unit[0][i] + s;
+        }
+        return head + s.replace(/(零.)*零圆/, '圆').replace(/(零.)+/g, '零').replace(/^整$/, '零圆整').replace(/圆$/, '圆整');
+    }
+
+    function doConvertUpper() {
+        const val = document.getElementById('upperInput').value;
+        document.getElementById('upperResult').innerText = digitToChinese(val);
+    }
+
+    function copyUpperText() {
+        const text = document.getElementById('upperResult').innerText;
+        if (text === "等待输入...") return;
+        navigator.clipboard.writeText(text).then(() => alert('大写金额已复制：' + text));
+    }
+</script>
+
+</body>
+</html>
