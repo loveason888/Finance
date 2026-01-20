@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金融信息管理终端</title>
+    <title>金融信息管理终端 - 云端同步版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
@@ -45,31 +45,44 @@
         .data-row:hover .copy-btn {
             opacity: 1;
         }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-blur: 4px;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
+    <div id="loading" class="loading-overlay">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin"></div>
+            <p class="mt-4 text-slate-600 font-medium">正在同步云端数据...</p>
+        </div>
+    </div>
+
     <div class="max-w-7xl mx-auto">
-        <!-- 头部 -->
         <header class="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
                 <h1 class="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3 justify-center md:justify-start">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3Z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10h10V2z"/><path d="M22 12H12v10h10V12z"/><path d="M12 12H2v10h10V12z"/><path d="M22 2H12v10h10V2z"/></svg>
                     金融信息管理终端
+                    <span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full uppercase">云端同步已开启</span>
                 </h1>
-                <p class="text-slate-500 mt-2">安全、快速、高效的财务办公辅助系统</p>
+                <p class="text-slate-500 mt-2">数据将自动保存至云端，可在多设备间实时同步</p>
             </div>
-            <div class="flex gap-2 justify-center">
-                <button onclick="clearAllData()" class="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                    清空本地缓存
-                </button>
+            <div class="flex gap-2 justify-center text-sm text-slate-400" id="userStatus">
+                正在验证身份...
             </div>
         </header>
 
-        <!-- 三模块布局 -->
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            
-            <!-- 模块一：银行账户信息 -->
             <section class="space-y-6">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-semibold text-slate-700 flex items-center gap-2">
@@ -83,7 +96,6 @@
                 <div id="bankList" class="space-y-4"></div>
             </section>
 
-            <!-- 模块二：久其账套信息 -->
             <section class="space-y-6">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-semibold text-slate-700 flex items-center gap-2">
@@ -97,7 +109,6 @@
                 <div id="jiuqiList" class="space-y-4"></div>
             </section>
 
-            <!-- 模块三：报表服务器 -->
             <section class="space-y-6">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-semibold text-slate-700 flex items-center gap-2">
@@ -113,7 +124,6 @@
         </div>
     </div>
 
-    <!-- 添加/修改弹窗 -->
     <div id="modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h3 id="modalTitle" class="text-xl font-bold mb-4 text-slate-800">编辑信息</h3>
@@ -123,163 +133,194 @@
                 <div id="formFields" class="space-y-4"></div>
                 <div class="flex gap-3 mt-6">
                     <button type="button" onclick="hideModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">取消</button>
-                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-900 text-white rounded-xl hover:bg-blue-800 shadow-lg shadow-blue-900/20 transition-all">保存数据</button>
+                    <button type="submit" id="submitBtn" class="flex-1 px-4 py-2 bg-blue-900 text-white rounded-xl hover:bg-blue-800 shadow-lg shadow-blue-900/20 transition-all">保存到云端</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 复制提示 -->
     <div id="toast" class="copy-toast bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-        <span id="toastMessage">已成功复制到剪贴板</span>
+        <span id="toastMessage">已同步</span>
     </div>
 
-    <script>
-        let db = {
-            bank: JSON.parse(localStorage.getItem('f_bank') || '[]'),
-            jiuqi: JSON.parse(localStorage.getItem('f_jiuqi') || '[]'),
-            server: JSON.parse(localStorage.getItem('f_server') || '[]')
-        };
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 获取环境配置
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'finance-vault-default';
+        const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 应用状态
+        let user = null;
+        let data = { bank: [], jiuqi: [], server: [] };
 
         const config = {
-            bank: {
-                title: '银行账户',
-                fields: [
-                    { key: 'name', label: '账户名称', placeholder: '公司或个人账户全称' },
-                    { key: 'account', label: '银行账号', placeholder: '请输入完整银行卡号' },
-                    { key: 'branch', label: '开户行', placeholder: '具体支行名称' }
-                ]
-            },
-            jiuqi: {
-                title: '久其账套',
-                fields: [
-                    { key: 'code', label: '账套代码', placeholder: '如：8001' },
-                    { key: 'name', label: '账套名称', placeholder: '久其系统的账套全称' }
-                ]
-            },
-            server: {
-                title: '报表服务器',
-                fields: [
-                    { key: 'address', label: '服务器地址', placeholder: 'http://192.168.x.x:8080' },
-                    { key: 'user', label: '用户名', placeholder: '登录账号' },
-                    { key: 'pass', label: '密码', placeholder: '登录密码' }
-                ]
+            bank: { title: '银行账户', fields: [{ key: 'name', label: '账户名称' }, { key: 'account', label: '银行账号' }, { key: 'branch', label: '开户行' }], border: 'border-blue-900' },
+            jiuqi: { title: '久其账套', fields: [{ key: 'code', label: '账套代码' }, { key: 'name', label: '账套名称' }], border: 'border-indigo-600' },
+            server: { title: '报表服务器', fields: [{ key: 'address', label: '服务器地址' }, { key: 'user', label: '用户名' }, { key: 'pass', label: '密码' }], border: 'border-emerald-600' }
+        };
+
+        // 初始化认证 (Rule 3)
+        const initAuth = async () => {
+            try {
+                if (initialToken) {
+                    await signInWithCustomToken(auth, initialToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth failed:", error);
+                document.getElementById('userStatus').innerHTML = '<span class="text-red-500">连接失败，请检查网络</span>';
             }
         };
 
-        function showModal(type, id = null) {
-            const formType = document.getElementById('formType');
-            const editIdInput = document.getElementById('editId');
+        onAuthStateChanged(auth, (u) => {
+            user = u;
+            if (user) {
+                document.getElementById('userStatus').innerText = `已连接: ${user.uid.substring(0, 8)}...`;
+                startSync();
+            }
+        });
+
+        // 启动实时同步 (Rule 1 & 2)
+        function startSync() {
+            if (!user) return;
+            
+            // 每一个模块对应一个集合
+            ['bank', 'jiuqi', 'server'].forEach(type => {
+                // 公共路径模式 (Rule 1)
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', type);
+                
+                onSnapshot(colRef, (snapshot) => {
+                    data[type] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    render();
+                    document.getElementById('loading').style.display = 'none';
+                }, (error) => {
+                    console.error(`Sync ${type} error:`, error);
+                });
+            });
+        }
+
+        // 保存/更新到 Firestore
+        async function saveToCloud(type, id, payload) {
+            if (!user) return;
+            const docId = id || Date.now().toString();
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', type, docId);
+            
+            try {
+                await setDoc(docRef, {
+                    ...payload,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                showToast("保存成功");
+            } catch (e) {
+                console.error("Error saving:", e);
+                showToast("保存失败，请重试", "text-red-400");
+            }
+        }
+
+        // 删除文档
+        async function deleteFromCloud(type, id) {
+            if (!user || !confirm('确定要从云端删除吗？')) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', type, id);
+            try {
+                await deleteDoc(docRef);
+                showToast("已删除");
+            } catch (e) {
+                console.error("Error deleting:", e);
+            }
+        }
+
+        // UI 逻辑
+        window.showModal = (type, id = null) => {
             const formFields = document.getElementById('formFields');
-            const modalTitle = document.getElementById('modalTitle');
+            document.getElementById('formType').value = type;
+            document.getElementById('editId').value = id || '';
             
-            formType.value = type;
-            editIdInput.value = id || '';
-            
-            let currentData = id ? db[type].find(i => i.id == id) : null;
-            modalTitle.innerText = id ? `修改${config[type].title}` : `添加${config[type].title}`;
+            const currentData = id ? data[type].find(i => i.id == id) : null;
+            document.getElementById('modalTitle').innerText = id ? `修改${config[type].title}` : `添加${config[type].title}`;
             
             formFields.innerHTML = config[type].fields.map(f => `
                 <div>
                     <label class="block text-sm font-medium text-slate-600 mb-1">${f.label}</label>
-                    <input name="${f.key}" required 
-                        value="${currentData ? currentData[f.key] : ''}" 
-                        placeholder="${f.placeholder}" 
+                    <input name="${f.key}" required value="${currentData ? currentData[f.key] : ''}" 
                         class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
                 </div>
             `).join('');
             
-            document.getElementById('modal').classList.remove('hidden');
-            document.getElementById('modal').classList.add('flex');
-        }
+            document.getElementById('modal').classList.replace('hidden', 'flex');
+        };
 
-        function hideModal() {
-            document.getElementById('modal').classList.add('hidden');
-            document.getElementById('modal').classList.remove('flex');
-            document.getElementById('infoForm').reset();
-        }
+        window.hideModal = () => {
+            document.getElementById('modal').classList.replace('flex', 'hidden');
+        };
 
-        document.getElementById('infoForm').onsubmit = (e) => {
+        document.getElementById('infoForm').onsubmit = async (e) => {
             e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "正在同步...";
+
             const type = document.getElementById('formType').value;
             const editId = document.getElementById('editId').value;
             const formData = new FormData(e.target);
+            const payload = {};
+            config[type].fields.forEach(f => payload[f.key] = formData.get(f.key));
+
+            await saveToCloud(type, editId, payload);
             
-            const entry = { id: editId ? parseInt(editId) : Date.now() };
-            config[type].fields.forEach(f => {
-                entry[f.key] = formData.get(f.key);
-            });
-            
-            if (editId) {
-                const index = db[type].findIndex(i => i.id == editId);
-                if (index !== -1) db[type][index] = entry;
-            } else {
-                db[type].push(entry);
-            }
-            
-            save();
-            render();
+            submitBtn.disabled = false;
+            submitBtn.innerText = "保存到云端";
             hideModal();
         };
 
-        function deleteEntry(type, id) {
-            if(confirm('确定要删除这条信息吗？')) {
-                db[type] = db[type].filter(item => item.id !== id);
-                save();
-                render();
-            }
-        }
-
-        function save() {
-            localStorage.setItem('f_bank', JSON.stringify(db.bank));
-            localStorage.setItem('f_jiuqi', JSON.stringify(db.jiuqi));
-            localStorage.setItem('f_server', JSON.stringify(db.server));
-        }
-
-        function copy(text, customMsg = '已成功复制到剪贴板') {
+        window.copy = (text, msg = "已复制") => {
             const el = document.createElement('textarea');
             el.value = text;
             document.body.appendChild(el);
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
+            showToast(msg);
+        };
 
+        window.copyAll = (type, id) => {
+            const item = data[type].find(i => i.id === id);
+            let text = "";
+            config[type].fields.forEach(f => text += `${f.label}：${item[f.key]}\n`);
+            window.copy(text.trim(), "已复制全部信息");
+        };
+
+        window.deleteEntry = (type, id) => deleteFromCloud(type, id);
+
+        function showToast(message) {
             const toast = document.getElementById('toast');
-            const msg = document.getElementById('toastMessage');
-            msg.innerText = customMsg;
+            document.getElementById('toastMessage').innerText = message;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 2000);
         }
 
-        function copyAllInfo(type, id) {
-            const item = db[type].find(i => i.id === id);
-            if (!item) return;
-            let text = "";
-            if(type === 'bank') {
-                text = `账户名称：${item.name}\n银行账号：${item.account}\n开户行：${item.branch}`;
-            } else if(type === 'server') {
-                text = `服务器地址：${item.address}\n用户名：${item.user}\n密码：${item.pass}`;
-            } else {
-                text = `账套代码：${item.code}\n账套名称：${item.name}`;
-            }
-            copy(text, '已复制全部信息');
-        }
-
         function render() {
-            const renderSection = (type, targetId, borderClass, btnColorClass) => {
-                const list = db[type];
-                document.getElementById(targetId).innerHTML = list.length ? list.map(item => `
-                    <div class="glass-card p-5 rounded-2xl group relative border-t-4 ${borderClass}">
+            ['bank', 'jiuqi', 'server'].forEach(type => {
+                const list = data[type];
+                document.getElementById(`${type}List`).innerHTML = list.length ? list.map(item => `
+                    <div class="glass-card p-5 rounded-2xl group relative border-t-4 ${config[type].border}">
                         <div class="absolute top-4 right-4 flex gap-2">
-                            <button onclick="copyAllInfo('${type}', ${item.id})" class="text-xs font-bold transition-all flex items-center gap-1 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600">
-                                复制
-                            </button>
-                            <!-- 编辑按钮 -->
-                            <button onclick="showModal('${type}', ${item.id})" class="p-1 text-slate-300 hover:text-blue-600 transition-colors" title="修改">
+                            <button onclick="copyAll('${type}', '${item.id}')" class="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">一键复制</button>
+                            <button onclick="showModal('${type}', '${item.id}')" class="p-1 text-slate-300 hover:text-blue-600 transition-colors">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </button>
-                            <button onclick="deleteEntry('${type}', ${item.id})" class="p-1 text-slate-300 hover:text-red-500 transition-colors" title="删除">
+                            <button onclick="deleteEntry('${type}', '${item.id}')" class="p-1 text-slate-300 hover:text-red-500 transition-colors">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                             </button>
                         </div>
@@ -288,32 +329,21 @@
                                 <div class="data-row flex items-center justify-between">
                                     <div class="flex-1">
                                         <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">${f.label}</p>
-                                        <p class="text-slate-800 font-medium break-all text-sm ${f.key === 'pass' ? 'font-mono' : ''}">${item[f.key]}</p>
+                                        <p class="text-slate-800 font-medium break-all text-sm">${item[f.key]}</p>
                                     </div>
-                                    <button onclick="copy('${item[f.key]}')" class="copy-btn opacity-0 ml-2 p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-all" title="复制此项">
+                                    <button onclick="copy('${item[f.key]}')" class="copy-btn opacity-0 ml-2 p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-all">
                                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                     </button>
                                 </div>
                             `).join('')}
                         </div>
                     </div>
-                `).join('') : '<div class="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">暂无记录</div>';
-            };
-
-            renderSection('bank', 'bankList', 'border-blue-900', 'blue');
-            renderSection('jiuqi', 'jiuqiList', 'border-indigo-600', 'indigo');
-            renderSection('server', 'serverList', 'border-emerald-600', 'emerald');
+                `).join('') : '<div class="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">暂无云端数据</div>';
+            });
         }
 
-        function clearAllData() {
-            if (confirm('确定要清空所有本地保存的机密信息吗？')) {
-                db = { bank: [], jiuqi: [], server: [] };
-                save();
-                render();
-            }
-        }
-
-        window.onload = render;
+        // 启动
+        initAuth();
     </script>
 </body>
 </html>
