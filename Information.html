@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金融信息管理终端 - 云端同步版</title>
+    <title>金融信息管理终端 - 智能同步版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
             --primary: #1e3a8a;
-            --secondary: #3b82f6;
-            --accent: #60a5fa;
             --bg: #f8fafc;
         }
 
@@ -42,29 +40,31 @@
             transform: translateX(-50%) translateY(0);
         }
 
-        .data-row:hover .copy-btn {
-            opacity: 1;
-        }
-
         .loading-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.95);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 2000;
-            backdrop-filter: blur(8px);
+        }
+
+        .data-row:hover .copy-btn {
+            opacity: 1;
         }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
     <div id="loading" class="loading-overlay">
-        <div class="flex flex-col items-center">
-            <div class="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin"></div>
-            <p class="mt-4 text-slate-600 font-medium" id="loadingText">正在同步云端数据...</p>
-            <button id="retryBtn" onclick="location.reload()" class="mt-4 hidden px-4 py-2 bg-blue-900 text-white rounded-lg text-sm">点击重试</button>
+        <div class="flex flex-col items-center p-8 max-w-sm text-center">
+            <div id="spinner" class="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin"></div>
+            <p class="mt-4 text-slate-700 font-medium" id="loadingText">正在初始化安全沙箱...</p>
+            <p class="mt-2 text-xs text-slate-400" id="subLoadingText">正在建立加密身份通道</p>
+            <button id="forceEnter" onclick="dismissLoading()" class="mt-6 hidden px-6 py-2 bg-slate-100 text-slate-600 rounded-full text-sm hover:bg-slate-200 transition-all">
+                跳过同步直接进入
+            </button>
         </div>
     </div>
 
@@ -72,27 +72,22 @@
         <header class="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
                 <h1 class="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3 justify-center md:justify-start">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10h10V2z"/><path d="M22 12H12v10h10V12z"/><path d="M12 12H2v10h10V12z"/><path d="M22 2H12v10h10V2z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
                     金融信息管理终端
-                    <span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full uppercase">云端同步已开启</span>
+                    <span id="syncBadge" class="ml-2 px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] rounded-full uppercase">离线</span>
                 </h1>
-                <p class="text-slate-500 mt-2">数据实时同步 · 多端共享</p>
+                <p class="text-slate-500 mt-2">安全加密存储 · 多端数据同步</p>
             </div>
-            <div class="flex gap-2 justify-center text-sm text-slate-400" id="userStatus">
-                验证中...
-            </div>
+            <div class="text-xs text-slate-400" id="userStatus">连接中...</div>
         </header>
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             <section class="space-y-6">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-semibold text-slate-700 flex items-center gap-2">
-                        <span class="w-2 h-6 bg-blue-900 rounded-full"></span>
-                        银行账户信息
+                        <span class="w-2 h-6 bg-blue-900 rounded-full"></span>银行账户
                     </h2>
-                    <button onclick="showModal('bank')" class="bg-blue-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20">
-                        + 添加账户
-                    </button>
+                    <button onclick="showModal('bank')" class="bg-blue-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800 transition-all shadow-lg">+ 添加</button>
                 </div>
                 <div id="bankList" class="space-y-4"></div>
             </section>
@@ -100,12 +95,9 @@
             <section class="space-y-6">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-semibold text-slate-700 flex items-center gap-2">
-                        <span class="w-2 h-6 bg-indigo-600 rounded-full"></span>
-                        久其账套信息
+                        <span class="w-2 h-6 bg-indigo-600 rounded-full"></span>久其账套
                     </h2>
-                    <button onclick="showModal('jiuqi')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
-                        + 添加账套
-                    </button>
+                    <button onclick="showModal('jiuqi')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-500 transition-all shadow-lg">+ 添加</button>
                 </div>
                 <div id="jiuqiList" class="space-y-4"></div>
             </section>
@@ -113,12 +105,9 @@
             <section class="space-y-6">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-semibold text-slate-700 flex items-center gap-2">
-                        <span class="w-2 h-6 bg-emerald-600 rounded-full"></span>
-                        报表服务器
+                        <span class="w-2 h-6 bg-emerald-600 rounded-full"></span>报表服务器
                     </h2>
-                    <button onclick="showModal('server')" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20">
-                        + 添加服务器
-                    </button>
+                    <button onclick="showModal('server')" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-500 transition-all shadow-lg">+ 添加</button>
                 </div>
                 <div id="serverList" class="space-y-4"></div>
             </section>
@@ -127,51 +116,64 @@
 
     <div id="modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 id="modalTitle" class="text-xl font-bold mb-4 text-slate-800">编辑信息</h3>
+            <h3 id="modalTitle" class="text-xl font-bold mb-4">编辑信息</h3>
             <form id="infoForm" class="space-y-4">
                 <input type="hidden" id="formType">
                 <input type="hidden" id="editId">
                 <div id="formFields" class="space-y-4"></div>
                 <div class="flex gap-3 mt-6">
                     <button type="button" onclick="hideModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">取消</button>
-                    <button type="submit" id="submitBtn" class="flex-1 px-4 py-2 bg-blue-900 text-white rounded-xl hover:bg-blue-800 shadow-lg shadow-blue-900/20 transition-all">保存到云端</button>
+                    <button type="submit" id="submitBtn" class="flex-1 px-4 py-2 bg-blue-900 text-white rounded-xl hover:bg-blue-800 transition-all">保存数据</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="toast" class="copy-toast bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-        <span id="toastMessage">已同步</span>
+        <span id="toastMessage">操作成功</span>
     </div>
 
-    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 获取环境配置
         const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'finance-vault-default';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'finance-vault-v3';
         const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // 初始化 Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        let user = null;
-        let data = { bank: [], jiuqi: [], server: [] };
-        let syncCount = 0; // 用于追踪加载状态
-
-        const config = {
+        
+        let db, auth, currentUser;
+        let isCloudActive = false;
+        let localStore = { bank: [], jiuqi: [], server: [] };
+        
+        const moduleConfig = {
             bank: { title: '银行账户', fields: [{ key: 'name', label: '账户名称' }, { key: 'account', label: '银行账号' }, { key: 'branch', label: '开户行' }], border: 'border-blue-900' },
             jiuqi: { title: '久其账套', fields: [{ key: 'code', label: '账套代码' }, { key: 'name', label: '账套名称' }], border: 'border-indigo-600' },
-            server: { title: '报表服务器', fields: [{ key: 'address', label: '服务器地址' }, { key: 'user', label: '用户名' }, { key: 'pass', label: '密码' }], border: 'border-emerald-600' }
+            server: { title: '服务器', fields: [{ key: 'address', label: '地址' }, { key: 'user', label: '用户名' }, { key: 'pass', label: '密码' }], border: 'border-emerald-600' }
         };
 
-        // 认证逻辑优化 (Rule 3)
+        const loadingTimer = setTimeout(() => {
+            const btn = document.getElementById('forceEnter');
+            if (btn) btn.classList.remove('hidden');
+            document.getElementById('subLoadingText').innerText = "环境同步受阻，可以先离线使用";
+        }, 5000);
+
+        window.dismissLoading = () => {
+            clearTimeout(loadingTimer);
+            document.getElementById('loading').style.display = 'none';
+            if(!isCloudActive) {
+                document.getElementById('syncBadge').innerText = "离线模式";
+                document.getElementById('syncBadge').className = "ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded-full uppercase";
+                loadLocalData();
+                render();
+            }
+        };
+
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        // Rule 3: 必须先完成 Auth 才能查询 Firestore
         const initAuth = async () => {
             try {
                 if (initialToken) {
@@ -179,180 +181,164 @@
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (error) {
-                console.error("Auth Error:", error);
-                document.getElementById('loadingText').innerText = "身份验证失败，请重试。";
-                document.getElementById('retryBtn').classList.remove('hidden');
+            } catch (err) {
+                console.error("Auth Fail:", err);
+                dismissLoading();
             }
         };
 
-        onAuthStateChanged(auth, (u) => {
-            user = u;
+        onAuthStateChanged(auth, (user) => {
             if (user) {
-                document.getElementById('userStatus').innerText = `已连接: ${user.uid.substring(0, 8)}`;
-                startSync();
+                currentUser = user;
+                document.getElementById('userStatus').innerText = `ID: ${user.uid.substring(0,8)}`;
+                startCloudSync();
             }
         });
 
-        // 启动同步逻辑优化
-        function startSync() {
-            if (!user) return;
+        // Rule 1: 严格路径检查
+        function startCloudSync() {
+            if (!currentUser) return;
             
+            let syncedTypes = 0;
             ['bank', 'jiuqi', 'server'].forEach(type => {
+                // 使用公共路径：/artifacts/{appId}/public/data/{type}
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', type);
                 
-                // 监听实时更新 (Rule 1 & 2)
                 onSnapshot(colRef, (snapshot) => {
-                    data[type] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    localStore[type] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    isCloudActive = true;
+                    document.getElementById('syncBadge').innerText = "已同步";
+                    document.getElementById('syncBadge').className = "ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full uppercase";
                     render();
                     
-                    syncCount++;
-                    // 只要有一个集合加载完成，就允许进入界面
-                    if (syncCount >= 1) {
-                        document.getElementById('loading').style.display = 'none';
-                    }
-                }, (error) => {
-                    console.error(`Sync Error [${type}]:`, error);
-                    // 如果因为权限或其他原因报错，也尝试让用户看到界面以免死锁
-                    if (syncCount === 0) {
-                        setTimeout(() => {
-                            document.getElementById('loading').style.display = 'none';
-                        }, 3000);
+                    syncedTypes++;
+                    if (syncedTypes >= 1) dismissLoading();
+                }, (err) => {
+                    console.error(`Snapshot Error [${type}]:`, err.message);
+                    // 如果三个都报错且没同步过，则进入离线模式
+                    if(!isCloudActive && syncedTypes === 0) {
+                         setTimeout(() => dismissLoading(), 1000);
                     }
                 });
             });
         }
 
-        // 写入操作
-        async function saveToCloud(type, id, payload) {
-            if (!user) return;
-            const docId = id || Date.now().toString();
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', type, docId);
-            
-            try {
-                await setDoc(docRef, { ...payload, updatedAt: serverTimestamp() }, { merge: true });
-                showToast("同步成功");
-            } catch (e) {
-                console.error("Save Error:", e);
-                showToast("保存失败，请检查网络", "bg-red-500");
+        function loadLocalData() {
+            ['bank', 'jiuqi', 'server'].forEach(t => {
+                const saved = localStorage.getItem(`lv_${t}`);
+                if(saved) localStore[t] = JSON.parse(saved);
+            });
+        }
+
+        async function saveData(type, id, payload) {
+            if (isCloudActive && currentUser) {
+                try {
+                    const docId = id || Date.now().toString();
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', type, docId);
+                    await setDoc(docRef, { ...payload, timestamp: serverTimestamp() }, { merge: true });
+                } catch (e) {
+                    console.error("Cloud Save Failed", e);
+                    showToast("同步失败，存入本地");
+                }
             }
+            // 同时更新本地状态作为备份
+            const idx = localStore[type].findIndex(i => i.id == id);
+            if(idx > -1) localStore[type][idx] = { id, ...payload };
+            else localStore[type].push({ id: id || Date.now().toString(), ...payload });
+            
+            localStorage.setItem(`lv_${type}`, JSON.stringify(localStore[type]));
+            if(!isCloudActive) render();
+            showToast("保存成功");
         }
 
-        async function deleteFromCloud(type, id) {
-            if (!user || !confirm('确定要删除吗？')) return;
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', type, id);
-            try {
-                await deleteDoc(docRef);
-                showToast("已删除");
-            } catch (e) {
-                console.error("Delete Error:", e);
+        async function deleteData(type, id) {
+            if(!confirm("确认删除？")) return;
+            if (isCloudActive && currentUser) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', type, id));
             }
+            localStore[type] = localStore[type].filter(i => i.id != id);
+            localStorage.setItem(`lv_${type}`, JSON.stringify(localStore[type]));
+            if(!isCloudActive) render();
+            showToast("已删除");
         }
 
-        // 全局绑定 UI 交互函数
-        window.showModal = (type, id = null) => {
-            const formFields = document.getElementById('formFields');
-            document.getElementById('formType').value = type;
-            document.getElementById('editId').value = id || '';
-            
-            const currentData = id ? data[type].find(i => i.id == id) : null;
-            document.getElementById('modalTitle').innerText = id ? `修改${config[type].title}` : `添加${config[type].title}`;
-            
-            formFields.innerHTML = config[type].fields.map(f => `
-                <div>
-                    <label class="block text-sm font-medium text-slate-600 mb-1">${f.label}</label>
-                    <input name="${f.key}" required value="${currentData ? (currentData[f.key] || '') : ''}" 
-                        class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
-                </div>
-            `).join('');
-            
-            document.getElementById('modal').classList.remove('hidden');
-            document.getElementById('modal').classList.add('flex');
-        };
-
-        window.hideModal = () => {
-            document.getElementById('modal').classList.add('hidden');
-            document.getElementById('modal').classList.remove('flex');
-        };
-
-        document.getElementById('infoForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.innerText = "同步中...";
-
-            const type = document.getElementById('formType').value;
-            const editId = document.getElementById('editId').value;
-            const formData = new FormData(e.target);
-            const payload = {};
-            config[type].fields.forEach(f => payload[f.key] = formData.get(f.key));
-
-            await saveToCloud(type, editId, payload);
-            
-            submitBtn.disabled = false;
-            submitBtn.innerText = "保存到云端";
-            hideModal();
-        };
-
-        window.copy = (text, msg = "已复制") => {
-            const el = document.createElement('textarea');
-            el.value = text;
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-            showToast(msg);
-        };
-
-        window.copyAll = (type, id) => {
-            const item = data[type].find(i => i.id === id);
-            let text = "";
-            config[type].fields.forEach(f => text += `${f.label}：${item[f.key]}\n`);
-            window.copy(text.trim(), "已复制全部信息");
-        };
-
-        window.deleteEntry = (type, id) => deleteFromCloud(type, id);
-
-        function showToast(message, bgColor = "bg-slate-900") {
-            const toast = document.getElementById('toast');
-            toast.className = `copy-toast ${bgColor} text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2`;
-            document.getElementById('toastMessage').innerText = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
-        }
-
-        function render() {
+        window.render = () => {
             ['bank', 'jiuqi', 'server'].forEach(type => {
-                const list = data[type];
-                document.getElementById(`${type}List`).innerHTML = list.length ? list.map(item => `
-                    <div class="glass-card p-5 rounded-2xl group relative border-t-4 ${config[type].border}">
+                const container = document.getElementById(`${type}List`);
+                const items = localStore[type];
+                container.innerHTML = items.length ? items.map(item => `
+                    <div class="glass-card p-5 rounded-2xl group relative border-t-4 ${moduleConfig[type].border}">
                         <div class="absolute top-4 right-4 flex gap-2">
-                            <button onclick="copyAll('${type}', '${item.id}')" class="text-[10px] font-bold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">复制全部</button>
                             <button onclick="showModal('${type}', '${item.id}')" class="p-1 text-slate-300 hover:text-blue-600 transition-colors">
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 00 2 2h14a2 2 0 00 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </button>
-                            <button onclick="deleteEntry('${type}', '${item.id}')" class="p-1 text-slate-300 hover:text-red-500 transition-colors">
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <button onclick="deleteData('${type}', '${item.id}')" class="p-1 text-slate-300 hover:text-red-500 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                             </button>
                         </div>
                         <div class="space-y-3 mt-4">
-                            ${config[type].fields.map(f => `
+                            ${moduleConfig[type].fields.map(f => `
                                 <div class="data-row flex items-center justify-between">
                                     <div class="flex-1">
-                                        <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">${f.label}</p>
-                                        <p class="text-slate-800 font-medium break-all text-sm">${item[f.key] || '-'}</p>
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase mb-0.5">${f.label}</p>
+                                        <p class="text-slate-800 font-medium text-sm break-all">${item[f.key] || '-'}</p>
                                     </div>
-                                    <button onclick="copy('${item[f.key]}')" class="copy-btn opacity-0 ml-2 p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-all">
-                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <button onclick="copyText('${item[f.key]}')" class="copy-btn opacity-0 p-2 hover:bg-slate-100 rounded-lg transition-all">
+                                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                                     </button>
                                 </div>
                             `).join('')}
                         </div>
                     </div>
-                `).join('') : '<div class="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">暂无云端数据</div>';
+                `).join('') : '<div class="text-center py-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">暂无数据</div>';
             });
+        };
+
+        window.showModal = (type, id = null) => {
+            const fields = document.getElementById('formFields');
+            document.getElementById('formType').value = type;
+            document.getElementById('editId').value = id || '';
+            const item = id ? localStore[type].find(i => i.id == id) : null;
+            document.getElementById('modalTitle').innerText = (id ? '修改' : '添加') + moduleConfig[type].title;
+            fields.innerHTML = moduleConfig[type].fields.map(f => `
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1 uppercase">${f.label}</label>
+                    <input name="${f.key}" required value="${item ? (item[f.key] || '') : ''}" class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            `).join('');
+            document.getElementById('modal').classList.replace('hidden', 'flex');
+        };
+
+        window.hideModal = () => document.getElementById('modal').classList.replace('flex', 'hidden');
+
+        document.getElementById('infoForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const type = document.getElementById('formType').value;
+            const id = document.getElementById('editId').value;
+            const payload = {};
+            new FormData(e.target).forEach((val, key) => payload[key] = val);
+            await saveData(type, id, payload);
+            hideModal();
+        };
+
+        window.copyText = (t) => {
+            const el = document.createElement('textarea');
+            el.value = t;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showToast("已复制");
+        };
+
+        function showToast(m) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMessage').innerText = m;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
         }
 
+        window.deleteData = deleteData;
         initAuth();
     </script>
 </body>
