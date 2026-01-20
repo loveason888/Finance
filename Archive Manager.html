@@ -109,7 +109,7 @@
             <div class="glass-panel p-5 border-b-4 border-cyan-500 col-span-1 md:col-span-2">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
                     <div>
-                        <p class="text-slate-400 text-xs">显示范围筛选量</p>
+                        <p class="text-slate-400 text-xs">完成日期筛选量</p>
                         <h3 class="text-2xl font-black text-white" id="stat-period-volumes">0 <span class="text-xs font-normal text-slate-500 ml-1">卷</span></h3>
                     </div>
                     <div class="flex items-center gap-2 bg-slate-800/50 p-1.5 rounded-lg border border-white/5">
@@ -298,9 +298,9 @@
             const endSelect = document.getElementById('end-year-filter');
             const years = new Set();
             archives.forEach(a => {
-                years.add(a.fiscalYearStart);
-                years.add(a.fiscalYearEnd);
-                years.add(a.completionDate.substring(0, 4));
+                // 修改为仅收集完成日期年份
+                const completionYear = a.completionDate.substring(0, 4);
+                if (completionYear) years.add(completionYear);
             });
             const allYears = [...years].filter(Boolean).sort((a,b) => a - b);
             if (allYears.length === 0) allYears.push(new Date().getFullYear().toString());
@@ -341,14 +341,17 @@
             const startY = parseInt(document.getElementById('start-year-filter').value);
             const endY = parseInt(document.getElementById('end-year-filter').value);
             const searchTerm = document.getElementById('search-input').value.trim().toLowerCase();
+            
             if (startY > endY) document.getElementById('end-year-filter').value = startY;
+            
             let filtered = archives.filter(a => {
-                const itemStart = parseInt(a.fiscalYearStart);
-                const itemEnd = parseInt(a.fiscalYearEnd);
-                const inRange = !(itemEnd < startY || itemStart > endY);
+                // 修改筛选逻辑：根据完成日期 (completionDate) 的年份判断
+                const compYear = parseInt(a.completionDate.substring(0, 4));
+                const inRange = compYear >= startY && compYear <= endY;
                 const matchesSearch = !searchTerm || a.projectName.toLowerCase().includes(searchTerm);
                 return inRange && matchesSearch;
             });
+            
             updateDashboard(filtered);
             const tbody = document.getElementById('archive-table-body');
             tbody.innerHTML = '';
